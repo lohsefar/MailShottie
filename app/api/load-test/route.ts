@@ -32,7 +32,7 @@ interface TestStats {
 }
 
 // Store active tests (in production, use Redis or similar)
-const activeTests = new Map<string, { abort: AbortController; stats: TestStats }>();
+const activeTests = new Map<string, { abort: AbortController; stats: TestStats; totalEmails: number }>();
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -230,14 +230,17 @@ export async function POST(request: NextRequest) {
     activeTests.set(testId, {
       abort: abortController,
       stats,
+      totalEmails: config.totalEmails,
     });
 
     // Start test asynchronously
     runLoadTest(testId, config, abortController.signal, { current: stats }).then((finalStats) => {
-      // Test completed
+      // Test completed - abort signal to mark as completed
       const test = activeTests.get(testId);
       if (test) {
         test.stats = finalStats;
+        // Abort signal to mark test as completed (not aborted by user, but naturally completed)
+        test.abort.abort();
         // Keep in map for a bit to allow final stats retrieval, then delete
         setTimeout(() => activeTests.delete(testId), 60000); // Keep for 1 minute
       }
@@ -246,6 +249,7 @@ export async function POST(request: NextRequest) {
       const test = activeTests.get(testId);
       if (test) {
         test.stats.errors.push({ email: 0, error: error instanceof Error ? error.message : String(error) });
+        test.abort.abort(); // Mark as completed even on error
       }
       setTimeout(() => activeTests.delete(testId), 60000);
     });
@@ -272,10 +276,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Test not found" }, { status: 404 });
   }
 
-  // Check if test is still running (abort signal not aborted and we haven't reached total)
-  // We'll determine status based on whether the test is still in the activeTests map
-  // If it's been removed, it's completed. Otherwise check if aborted.
-  const isRunning = !test.abort.signal.aborted;
+  // Check if test is still running
+  // Test is completed if:
+  // 1. Abort signal is aborted (either manually stopped or naturally completed)
+  // 2. All emails have been sent (sent >= totalEmails)
+  const isRunning = !test.abort.signal.aborted && test.stats.sent < test.totalEmails;
   const status = isRunning ? "running" : "completed";
 
   return NextResponse.json({ testId, stats: test.stats, status });
