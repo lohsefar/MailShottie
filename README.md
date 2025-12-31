@@ -6,6 +6,10 @@ A powerful email load testing tool built with Next.js, designed to help you test
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue)
 ![React](https://img.shields.io/badge/React-19.2.3-blue)
 
+<div align="center">
+  <img src="http://s3.sauerbase.com/logos/mailshottie.png" alt="MailShottie Logo" width="400">
+</div>
+
 ## Features ✨
 
 - **Multiple Testing Modes**
