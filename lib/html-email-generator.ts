@@ -216,3 +216,7 @@ export function generateHTMLEmail(options: HTMLEmailOptions): string {
   return html.trim();
 }
 
+
+
+
+
